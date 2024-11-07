@@ -131,6 +131,7 @@ class _ItemCardState extends State<ItemCard> {
   bool isExpanded = false;
   int quantity = 0;
   Map<String, bool> extraServiceSelections = {};
+  TextEditingController _qty = TextEditingController(text: '0');
 
   @override
   void initState() {
@@ -253,18 +254,53 @@ class _ItemCardState extends State<ItemCard> {
             Column(
               children: widget.data.extraServices.map((service) {
                 final servicePrice = double.parse(service.addonServicePrice);
-                return CheckboxListTile(
-                  activeColor: Colors.black87,
-                  title: Text(
-                      '${service.addonServiceId} (₹${service.addonServicePrice})'),
-                  value: extraServiceSelections[service.addonServiceId],
-                  onChanged: (bool? value) {
-                    if (value != null) {
-                      _toggleExtraService(
-                          service.addonServiceId, servicePrice, value);
-                    }
-                  },
-                );
+                return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Checkbox(
+                            value:
+                                extraServiceSelections[service.addonServiceId],
+                            onChanged: (bool? value) {
+                              if (value != null) {
+                                _toggleExtraService(service.addonServiceId,
+                                    servicePrice, value);
+                              }
+                            },
+                          ),
+                          Text(
+                            '${service.addonServiceId}',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          SizedBox(
+                              height: 40,
+                              width: 80,
+                              child: TextFormField(
+                                controller: _qty,
+                                decoration: InputDecoration(
+                                    hintText: '0',
+                                    labelText: 'Qty',
+                                    suffixIcon: Icon(Icons.arrow_drop_down),
+                                    border: OutlineInputBorder()),
+                              )),
+                          SizedBox(
+                            width: 10,
+                          ),
+                          Text(
+                            '₹${service.addonServicePrice}',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          SizedBox(
+                            width: 10,
+                          ),
+                        ],
+                      )
+                    ]);
               }).toList(),
             ),
         ],
