@@ -37,10 +37,13 @@ class _CartBodyState extends State<CartBody> {
   }
 
   Future<void> _loadSavedServices() async {
-    final services = await PreferencesHelper.getSelectedServices();
-    print(services);
+    final services = await DBHelper().getSelectedServices();
     setState(() {
-      savedServices = services;
+      savedServices = Map.fromIterable(
+        services,
+        key: (e) => e['id'],
+        value: (e) => e,
+      );
     });
     _calculateTotalPriceAndDiscount();
   }
@@ -62,8 +65,11 @@ class _CartBodyState extends State<CartBody> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   savedServices.isEmpty
-                      ? Center(
-                          child: Text('No saved services'),
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 50),
+                          child: Center(
+                            child: Text('No services added'),
+                          ),
                         )
                       : ListView.builder(
                           itemCount: savedServices.length,

@@ -53,13 +53,11 @@ class _Screen1State extends State<Screen1> {
               ValueListenableBuilder<double>(
                 valueListenable: totalAmount,
                 builder: (context, value, child) {
-                  return Text('Total ${value.toStringAsFixed(2)}',
+                  return Text('Total ₹${value.toStringAsFixed(2)}',
                       style: TextStyle(color: Colors.white, fontSize: 16));
                 },
               ),
-              VerticalDivider(
-                color: Colors.white,
-              ),
+              VerticalDivider(color: Colors.white),
               ValueListenableBuilder<int>(
                 valueListenable: totalItems,
                 builder: (context, value, child) {
@@ -131,7 +129,7 @@ class _ItemCardState extends State<ItemCard> {
   bool isExpanded = false;
   int quantity = 0;
   Map<String, bool> extraServiceSelections = {};
-  TextEditingController _qty = TextEditingController(text: '0');
+  TextEditingController _qty = TextEditingController(text: '1');
 
   @override
   void initState() {
@@ -141,11 +139,13 @@ class _ItemCardState extends State<ItemCard> {
       extraServiceSelections[service.addonServiceId] = false;
     }
 
-    PreferencesHelper.getServiceQuantity(widget.data.itemId)
-        .then((savedQuantity) {
-      setState(() {
-        quantity = savedQuantity;
-      });
+    _loadServiceQuantity();
+  }
+
+  Future<void> _loadServiceQuantity() async {
+    int savedQuantity = await DBHelper().getServiceQuantity(widget.data.itemId);
+    setState(() {
+      quantity = savedQuantity;
     });
   }
 
@@ -155,7 +155,7 @@ class _ItemCardState extends State<ItemCard> {
       widget.updateTotal(double.parse(widget.data.price), 1);
     });
 
-    await PreferencesHelper.saveSelectedService(widget.data, quantity);
+    await DBHelper().saveSelectedService(widget.data, quantity);
   }
 
   Future<void> _decrementQuantity() async {
@@ -166,9 +166,9 @@ class _ItemCardState extends State<ItemCard> {
       });
 
       if (quantity == 0) {
-        await PreferencesHelper.removeServiceQuantity(widget.data.itemId);
+        await DBHelper().removeServiceQuantity(widget.data.itemId);
       } else {
-        await PreferencesHelper.saveSelectedService(widget.data, quantity);
+        await DBHelper().saveSelectedService(widget.data, quantity);
       }
     }
   }
@@ -187,24 +187,24 @@ class _ItemCardState extends State<ItemCard> {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(
-            color: Colors.grey.shade200,
+        color: Colors.white,
+        border: Border.all(
+          color: Colors.grey.shade200,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 5,
+            blurRadius: 5,
+            offset: Offset(0, 3),
           ),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 5,
-              blurRadius: 5,
-              offset: Offset(0, 3),
-            )
-          ]),
+        ],
+      ),
       child: Column(
         children: [
           ListTile(
             contentPadding: EdgeInsets.all(8),
-            // horizontalTitleGap: 4,
             leading: Image.network(
               widget.data.image,
               width: 60,
@@ -214,7 +214,6 @@ class _ItemCardState extends State<ItemCard> {
               widget.data.itemName,
               style: TextStyle(color: Colors.black54, fontSize: 14),
             ),
-
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -223,25 +222,27 @@ class _ItemCardState extends State<ItemCard> {
                   style: TextStyle(fontSize: 14),
                 ),
                 ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        shape: CircleBorder(), backgroundColor: Colors.blue),
-                    onPressed: _decrementQuantity,
-                    child: Icon(
-                      Icons.remove,
-                      color: Colors.white,
-                    )),
+                  style: ElevatedButton.styleFrom(
+                      shape: CircleBorder(), backgroundColor: Colors.blue),
+                  onPressed: _decrementQuantity,
+                  child: Icon(
+                    Icons.remove,
+                    color: Colors.white,
+                  ),
+                ),
                 Text(
                   '$quantity',
                   style: TextStyle(fontSize: 14),
                 ),
                 ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        shape: CircleBorder(), backgroundColor: Colors.blue),
-                    onPressed: _incrementQuantity,
-                    child: Icon(
-                      Icons.add,
-                      color: Colors.white,
-                    )),
+                  style: ElevatedButton.styleFrom(
+                      shape: CircleBorder(), backgroundColor: Colors.blue),
+                  onPressed: _incrementQuantity,
+                  child: Icon(
+                    Icons.add,
+                    color: Colors.white,
+                  ),
+                ),
               ],
             ),
             onTap: () {
@@ -255,52 +256,50 @@ class _ItemCardState extends State<ItemCard> {
               children: widget.data.extraServices.map((service) {
                 final servicePrice = double.parse(service.addonServicePrice);
                 return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Checkbox(
-                            value:
-                                extraServiceSelections[service.addonServiceId],
-                            onChanged: (bool? value) {
-                              if (value != null) {
-                                _toggleExtraService(service.addonServiceId,
-                                    servicePrice, value);
-                              }
-                            },
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: extraServiceSelections[service.addonServiceId],
+                          onChanged: (bool? value) {
+                            if (value != null) {
+                              _toggleExtraService(
+                                  service.addonServiceId, servicePrice, value);
+                            }
+                          },
+                        ),
+                        Text(
+                          '${service.addonServiceId}',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        SizedBox(
+                          height: 40,
+                          width: 80,
+                          child: TextFormField(
+                            controller: _qty,
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              labelText: 'Qty',
+                              suffixIcon: Icon(Icons.arrow_drop_down),
+                              border: OutlineInputBorder(),
+                            ),
                           ),
-                          Text(
-                            '${service.addonServiceId}',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          SizedBox(
-                              height: 40,
-                              width: 80,
-                              child: TextFormField(
-                                controller: _qty,
-                                decoration: InputDecoration(
-                                    hintText: '0',
-                                    labelText: 'Qty',
-                                    suffixIcon: Icon(Icons.arrow_drop_down),
-                                    border: OutlineInputBorder()),
-                              )),
-                          SizedBox(
-                            width: 10,
-                          ),
-                          Text(
-                            '₹${service.addonServicePrice}',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          SizedBox(
-                            width: 10,
-                          ),
-                        ],
-                      )
-                    ]);
+                        ),
+                        SizedBox(width: 10),
+                        Text(
+                          '₹${service.addonServicePrice}',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        SizedBox(width: 10),
+                      ],
+                    ),
+                  ],
+                );
               }).toList(),
             ),
         ],

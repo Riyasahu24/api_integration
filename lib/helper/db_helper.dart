@@ -1,54 +1,89 @@
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 import 'package:assignment/model/product_model.dart';
 
-class PreferencesHelper {
-  static const String servicesKey = 'selectedServices';
+class DBHelper {
+  static final DBHelper _instance = DBHelper._();
+  static Database? _database;
 
-  static Future<void> saveSelectedService(
-      Services service, int quantity) async {
-    final prefs = await SharedPreferences.getInstance();
-    Map<String, dynamic> services = prefs.getString(servicesKey) != null
-        ? json.decode(prefs.getString(servicesKey)!)
-        : {};
+  DBHelper._();
 
+  factory DBHelper() {
+    return _instance;
+  }
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDB();
+    return _database!;
+  }
+
+  Future<Database> _initDB() async {
+    String path = join(await getDatabasesPath(), 'product_database.db');
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: _createDB,
+    );
+  }
+
+  Future _createDB(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE selectedServices (
+        id TEXT PRIMARY KEY,
+        itemName TEXT,
+        price REAL,
+        discount REAL,
+        quantity INTEGER
+      )
+    ''');
+  }
+
+  Future<void> saveSelectedService(Services service, int quantity) async {
+    final db = await database;
     double discount = (double.tryParse(service.price) ?? 0.0) /
         (double.tryParse(service.discount[0].percentage) ?? 0.0);
     double discountedPrice = (double.tryParse(service.price) ?? 0.0) - discount;
 
-    services[service.itemId] = {
-      'quantity': quantity,
-      'price': service.price,
-      'itemName': service.itemName,
-      'discount': discountedPrice,
-    };
-
-    await prefs.setString(servicesKey, json.encode(services));
+    await db.insert(
+      'selectedServices',
+      {
+        'id': service.itemId,
+        'itemName': service.itemName,
+        'price': double.tryParse(service.price),
+        'discount': discountedPrice,
+        'quantity': quantity
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
-  static Future<Map<String, dynamic>> getSelectedServices() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? servicesString = prefs.getString(servicesKey);
-
-    if (servicesString != null) {
-      return Map<String, dynamic>.from(json.decode(servicesString));
-    }
-    return {};
-  }
-
-  static Future<int> getServiceQuantity(String itemId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final Map<String, dynamic> services = await getSelectedServices();
-    if (services.containsKey(itemId)) {
-      return services[itemId]['quantity'] ?? 0;
+  Future<int> getServiceQuantity(String itemId) async {
+    final db = await database;
+    final result = await db.query(
+      'selectedServices',
+      columns: ['quantity'],
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+    if (result.isNotEmpty) {
+      return result.first['quantity'] as int;
     }
     return 0;
   }
 
-  static Future<void> removeServiceQuantity(String itemId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final Map<String, dynamic> services = await getSelectedServices();
-    services.remove(itemId);
-    await prefs.setString(servicesKey, json.encode(services));
+  Future<void> removeServiceQuantity(String itemId) async {
+    final db = await database;
+    await db.delete(
+      'selectedServices',
+      where: 'id = ?',
+      whereArgs: [itemId],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getSelectedServices() async {
+    final db = await database;
+    return await db.query('selectedServices');
   }
 }
